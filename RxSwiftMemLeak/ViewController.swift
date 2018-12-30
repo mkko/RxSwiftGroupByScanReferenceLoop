@@ -27,24 +27,24 @@ class IntListener {
 
 class ViewController: UIViewController {
 
-    private var temp: Disposable!
+    private let disposeBag = DisposeBag()
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
         let activeToggle = Observable<Int>
-            .interval(15, scheduler: MainScheduler.instance)
+            .interval(5, scheduler: MainScheduler.instance)
             .startWith(0)
             .map { $0 % 2 == 0}
         let someProducer = Observable<Int>
             .interval(1, scheduler: MainScheduler.instance)
             .startWith(0)
 
-        temp = activeToggle
+        activeToggle
             .flatMapLatest { isActive -> Observable<[IntListener]> in
                 if isActive {
                     return someProducer
-                        .groupBy(keySelector: { _ in 0 })
+                        .groupBy(keySelector: { $0 % 3 })
                         .scan([], accumulator: { (acc, g) in
                             acc + [IntListener(key: g.key, updates: g.asObservable())]
                         })
@@ -54,8 +54,40 @@ class ViewController: UIViewController {
             }
             .debug("-----")
             .subscribe()
+            .disposed(by: disposeBag)
 
+        // This works:
+        //activeToggle
+        //    .flatMapLatest { isActive -> Observable<[IntListener]> in
+        //        if isActive {
+        //            return someProducer
+        //                .groupBy(keySelector: { _ in 0 })
+        //                .map { g in
+        //                    [IntListener(key: g.key, updates: g.asObservable())]
+        //            }
+        //        } else {
+        //            return .just([])
+        //        }
+        //    }
+        //    .debug("-----")
+        //    .subscribe()
+        //    .disposed(by: disposeBag)
 
+        // This also works:
+        //activeToggle
+        //    .flatMapLatest { isActive -> Observable<[IntListener]> in
+        //        if isActive {
+        //            return someProducer
+        //                .scan([], accumulator: { (acc, g) in
+        //                    acc + [IntListener(key: g, updates: Observable<Int>.interval(1, scheduler: MainScheduler.instance))]
+        //                })
+        //        } else {
+        //            return .just([])
+        //        }
+        //    }
+        //    .debug("-----")
+        //    .subscribe()
+        //    .disposed(by: disposeBag)
     }
 
 
