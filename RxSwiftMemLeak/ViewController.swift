@@ -8,6 +8,7 @@
 
 import UIKit
 import RxSwift
+import RxCocoa
 
 class IntListener {
     let key: Int
@@ -27,66 +28,58 @@ class IntListener {
 
 class ViewController: UIViewController {
 
-    private let disposeBag = DisposeBag()
+    private var disposeBag = DisposeBag()
+
+    @IBOutlet weak var stopButton: UIButton!
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        let activeToggle = Observable<Int>
-            .interval(5, scheduler: MainScheduler.instance)
-            .startWith(0)
-            .map { $0 % 2 == 0}
+        let _ = stopButton.rx
+            .controlEvent(.touchUpInside)
+            .subscribe(onNext: {
+                self.disposeBag = DisposeBag()
+            })
+
         let someProducer = Observable<Int>
             .interval(1, scheduler: MainScheduler.instance)
             .startWith(0)
 
-        activeToggle
-            .flatMapLatest { isActive -> Observable<[IntListener]> in
-                if isActive {
-                    return someProducer
-                        .groupBy(keySelector: { $0 % 3 })
-                        .scan([], accumulator: { (acc, g) in
-                            acc + [IntListener(key: g.key, updates: g.asObservable())]
-                        })
-                } else {
-                    return .just([])
-                }
+        someProducer
+            .debug("")
+            .groupBy(keySelector: { $0 % 3 })
+            .scan([], accumulator: { (acc, g) in
+                acc + [IntListener(key: g.key, updates: g.asObservable())]
+            })
+            .debug("someProducer")
+            .subscribe { e in
+                print("e: \(e)")
             }
-            .debug("-----")
-            .subscribe()
             .disposed(by: disposeBag)
 
         // This works:
-        //activeToggle
-        //    .flatMapLatest { isActive -> Observable<[IntListener]> in
-        //        if isActive {
-        //            return someProducer
-        //                .groupBy(keySelector: { _ in 0 })
-        //                .map { g in
-        //                    [IntListener(key: g.key, updates: g.asObservable())]
-        //            }
-        //        } else {
-        //            return .just([])
-        //        }
+        //someProducer
+        //    .debug("")
+        //    .groupBy(keySelector: { _ in 0 })
+        //    .map { g in
+        //        [IntListener(key: g.key, updates: g.asObservable())]
         //    }
-        //    .debug("-----")
-        //    .subscribe()
+        //    .debug("someProducer")
+        //    .subscribe { e in
+        //        print("e: \(e)")
+        //    }
         //    .disposed(by: disposeBag)
 
         // This also works:
-        //activeToggle
-        //    .flatMapLatest { isActive -> Observable<[IntListener]> in
-        //        if isActive {
-        //            return someProducer
-        //                .scan([], accumulator: { (acc, g) in
-        //                    acc + [IntListener(key: g, updates: Observable<Int>.interval(1, scheduler: MainScheduler.instance))]
-        //                })
-        //        } else {
-        //            return .just([])
-        //        }
+        //someProducer
+        //    .debug("")
+        //    .scan([], accumulator: { (acc, g) in
+        //        acc + [IntListener(key: g, updates: Observable<Int>.interval(1, scheduler: MainScheduler.instance))]
+        //    })
+        //    .debug("someProducer")
+        //    .subscribe { e in
+        //        print("e: \(e)")
         //    }
-        //    .debug("-----")
-        //    .subscribe()
         //    .disposed(by: disposeBag)
     }
 
