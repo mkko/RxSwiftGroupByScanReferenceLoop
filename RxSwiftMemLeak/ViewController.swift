@@ -10,19 +10,22 @@ import UIKit
 import RxSwift
 import RxCocoa
 
-class IntListener {
-    let key: Int
+class Update {
+
+    private let key: Int
+
     private let disposeBag = DisposeBag()
+
     init(key: Int, updates: Observable<Int>) {
         self.key = key
         updates
-            .debug("IntListener.updates(\(key))")
+            .debug("Update(key: \(key))")
             .subscribe()
             .disposed(by: disposeBag)
     }
 
     deinit {
-        print("---- Killed IntListener(\(key))")
+        print("Update(\(key)).deinit")
     }
 }
 
@@ -45,16 +48,23 @@ class ViewController: UIViewController {
             .interval(1, scheduler: MainScheduler.instance)
             .startWith(0)
 
+        // Create a couple of grouped observables.
         someProducer
-            .debug("")
             .groupBy(keySelector: { $0 % 3 })
             .scan([], accumulator: { (acc, g) in
-                acc + [IntListener(key: g.key, updates: g.asObservable())]
+                acc + [Update(key: g.key, updates: g.asObservable())]
             })
-            .debug("someProducer")
-            .subscribe { e in
-                print("e: \(e)")
-            }
+            .debug("Main")
+            .subscribe()
+            .disposed(by: disposeBag)
+
+        // Make it stop after three seconds.
+        Observable<Int>
+            .interval(3, scheduler: MainScheduler.instance)
+            .subscribe(onNext: { _ in
+                print("Disposing...")
+                self.disposeBag = DisposeBag()
+            })
             .disposed(by: disposeBag)
 
         // This works:
@@ -62,9 +72,9 @@ class ViewController: UIViewController {
         //    .debug("")
         //    .groupBy(keySelector: { _ in 0 })
         //    .map { g in
-        //        [IntListener(key: g.key, updates: g.asObservable())]
+        //        [Update(key: g.key, updates: g.asObservable())]
         //    }
-        //    .debug("someProducer")
+        //    .debug("Main")
         //    .subscribe { e in
         //        print("e: \(e)")
         //    }
@@ -74,9 +84,9 @@ class ViewController: UIViewController {
         //someProducer
         //    .debug("")
         //    .scan([], accumulator: { (acc, g) in
-        //        acc + [IntListener(key: g, updates: Observable<Int>.interval(1, scheduler: MainScheduler.instance))]
+        //        acc + [Update(key: g, updates: someProducer)]
         //    })
-        //    .debug("someProducer")
+        //    .debug("Main")
         //    .subscribe { e in
         //        print("e: \(e)")
         //    }
